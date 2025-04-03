@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pulsing Star Animation</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #111;
+            touch-action: none;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="starCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('starCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Resize canvas to full window
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        
+        // Star properties
+        const star = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            size: 40,
+            points: 5,
+            color: '#FFFF00',
+            baseHue: 60, // Yellow in HSL
+            isHeld: false,
+            holdTime: 0,
+            pulseSize: 0,
+            pulseOpacity: 0.5,
+            glowRadius: 30
+        };
+        
+        // Animation properties
+        let animationFrame;
+        let lastTime = 0;
+        
+        // Handle mouse/touch events
+        function startHold(e) {
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX || e.touches[0].clientX) - rect.left;
+            const y = (e.clientY || e.touches[0].clientY) - rect.top;
+            
+            // Check if click is within star
+            const distance = Math.sqrt(
+                Math.pow(x - star.x, 2) + Math.pow(y - star.y, 2)
+            );
+            
+            if (distance < star.size) {
+                star.isHeld = true;
+                star.holdTime = 0;
+            }
+        }
+        
+        function endHold() {
+            star.isHeld = false;
+            star.holdTime = 0;
+        }
+        
+        // Add event listeners
+        canvas.addEventListener('mousedown', startHold);
+        canvas.addEventListener('touchstart', startHold);
+        canvas.addEventListener('mouseup', endHold);
+        canvas.addEventListener('touchend', endHold);
+        canvas.addEventListener('mouseleave', endHold);
+        
+        // Draw a star shape
+        function drawStar(x, y, radius, points, color) {
+            ctx.beginPath();
+            ctx.fillStyle = color;
+            
+            for (let i = 0; i < points * 2; i++) {
+                const angle = (i * Math.PI) / points;
+                const r = i % 2 === 0 ? radius : radius * 0.4;
+                const pointX = x + r * Math.sin(angle);
+                const pointY = y - r * Math.cos(angle);
+                
+                if (i === 0) {
+                    ctx.moveTo(pointX, pointY);
+                } else {
+                    ctx.lineTo(pointX, pointY);
+                }
+            }
+            
+            ctx.closePath();
+            ctx.fill();
+        }
+        
+        // Draw a glow around the star
+        function drawGlow(x, y, radius, color, opacity) {
+            const gradient = ctx.createRadialGradient(x, y, radius * 0.5, x, y, radius * 2);
+            gradient.addColorStop(0, color.replace(')', `, ${opacity})`).replace('rgb', 'rgba'));
+            gradient.addColorStop(1, color.replace(')', ', 0)').replace('rgb', 'rgba'));
+            
+            ctx.beginPath();
+            ctx.fillStyle = gradient;
+            ctx.arc(x, y, radius * 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // Update animation
+        function update(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            const deltaTime = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Center star on window resize
+            star.x = canvas.width / 2;
+            star.y = canvas.height / 2;
+            
+            // Update star properties based on hold time
+            if (star.isHeld) {
+                star.holdTime += deltaTime;
+                
+                // Increase glow radius and change color based on hold time
+                const maxHoldTime = 3; // Max hold time in seconds
+                const holdProgress = Math.min(star.holdTime / maxHoldTime, 1);
+                
+                // Change hue from yellow to red (60 to 0)
+                const newHue = star.baseHue * (1 - holdProgress);
+                star.color = `hsl(${newHue}, 100%, ${50 + holdProgress * 50}%)`;
+                star.glowRadius = 30 + holdProgress * 70;
+            } else {
+                // Default color when not held
+                star.color = `hsl(${star.baseHue}, 100%, 50%)`;
+                star.glowRadius = 30;
+            }
+            
+            // Pulse effect (always active)
+            star.pulseSize = Math.sin(timestamp * 0.003) * 10;
+            star.pulseOpacity = 0.2 + Math.sin(timestamp * 0.003) * 0.2;
+            
+            // Draw star glow
+            drawGlow(
+                star.x, 
+                star.y, 
+                star.size + star.pulseSize, 
+                star.color, 
+                star.pulseOpacity + (star.isHeld ? star.holdTime / 3 : 0)
+            );
+            
+            // Draw star
+            drawStar(
+                star.x, 
+                star.y, 
+                star.size + (star.isHeld ? star.pulseSize * 1.5 : star.pulseSize * 0.5), 
+                star.points, 
+                star.color
+            );
+            
+            // Continue animation
+            animationFrame = requestAnimationFrame(update);
+        }
+        
+        // Start animation
+        animationFrame = requestAnimationFrame(update);
+    </script>
+</body>
+</html>
